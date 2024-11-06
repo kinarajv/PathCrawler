@@ -71,9 +71,11 @@ class PathChecker
 
         Console.ForegroundColor = ConsoleColor.Blue;
         Console.WriteLine($"Total files checked: {totalChecked}");
-        Console.WriteLine($"Found: {foundCount}");
+        Console.WriteLine($"Correct Path: {foundCount}");
         Console.WriteLine($"Not Found: {notFoundCount}");
         Console.WriteLine($"Fixed: {fixedCount}");
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"Cant Fixed : {notFoundCount-fixedCount} :( ");
         Console.ResetColor();
     }
 
