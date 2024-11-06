@@ -13,7 +13,7 @@ namespace DirectoryScraper
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("========================================");
-            Console.WriteLine("          FILE CRAWLER PHP & JS        ️  ");
+            Console.WriteLine("          FILE CRAWLER PHP & JS         ");
             Console.WriteLine("========================================");
             Console.ResetColor();
             Console.WriteLine("Crafted with care by Kinara");
@@ -25,6 +25,7 @@ namespace DirectoryScraper
             Thread.Sleep(3000);
             PathChecker program = new PathChecker();
             program.ToCSV();
+            Thread.Sleep(1000);
             program.ExtractAjaxUrls("relative_file_paths.csv");
         }
     }

@@ -3,96 +3,134 @@
 namespace DirectoryScraper;
 
 class PathChecker
+{
+    private const string CsvFileName = "relative_file_paths.csv";
+    private const string ExtractedUrlsCsvFileName = "extracted_urls.csv";
+    private static readonly string[] SupportedExtensions = { ".js", ".php" };
+
+    private List<string> allRelativePaths = new List<string>();
+
+    public void ToCSV()
     {
-        private const string CsvFileName = "relative_file_paths.csv";
-        private const string ExtractedUrlsCsvFileName = "extracted_urls.csv";
-        private static readonly string[] SupportedExtensions = { ".js", ".php" };
+        string currentDirectory = Directory.GetCurrentDirectory();
+        string csvFilePath = Path.Combine(currentDirectory, CsvFileName);
+        int totalFiles = 0;
 
-        private List<string> allRelativePaths = new List<string>();
+        allRelativePaths = Directory.EnumerateFiles(currentDirectory, "*", SearchOption.AllDirectories)
+          .Select(filePath => Path.GetRelativePath(currentDirectory, filePath).Replace('\\', '/'))
+          .ToList();
 
-        public void ToCSV()
+        Console.WriteLine("Loading... Creating CSV file with relative paths.");
+        using (StreamWriter writer = new StreamWriter(csvFilePath))
         {
-            string currentDirectory = Directory.GetCurrentDirectory();
-            string csvFilePath = Path.Combine(currentDirectory, CsvFileName);
-
-            Console.WriteLine("Current directory: " + currentDirectory);
-
-            allRelativePaths = Directory.EnumerateFiles(currentDirectory, "*", SearchOption.AllDirectories)
-              .Select(filePath => Path.GetRelativePath(currentDirectory, filePath).Replace('\\', '/'))
-              .ToList();
-
-            using (StreamWriter writer = new StreamWriter(csvFilePath))
+            foreach (string relativeFilePath in allRelativePaths)
             {
-                foreach (string relativeFilePath in allRelativePaths)
+                writer.WriteLine(relativeFilePath);
+                totalFiles++;
+                if (totalFiles % 10 == 0) // Update progress for every 10 files
                 {
-                    writer.WriteLine(relativeFilePath);
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine("File Found : " + relativeFilePath);
-                    Console.ResetColor();
+                    Console.WriteLine($"Processed {totalFiles} files...");
                 }
             }
-
-            Console.BackgroundColor = ConsoleColor.Green;
-            Console.WriteLine("Relative file paths saved to: " + csvFilePath);
-            Console.ResetColor();
         }
 
-        public void ExtractAjaxUrls(string csvPath)
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"Total: {totalFiles} files. Relative file paths saved to: " + csvFilePath);
+        Console.ResetColor();
+    }
+
+    public void ExtractAjaxUrls(string csvPath)
+    {
+        int totalChecked = 0;
+        int foundCount = 0;
+        int notFoundCount = 0;
+        int fixedCount = 0;
+
+        var relativePaths = File.ReadAllLines(csvPath);
+
+        Console.WriteLine("Loading... Extracting AJAX URLs from files.");
+        using (StreamWriter urlWriter = new StreamWriter(ExtractedUrlsCsvFileName))
         {
-            var relativePaths = File.ReadAllLines(csvPath);
+            urlWriter.WriteLine("File,Extracted URL,Status,Suggestion");
 
-            using (StreamWriter urlWriter = new StreamWriter(ExtractedUrlsCsvFileName))
+            foreach (var relativePath in relativePaths)
             {
-                urlWriter.WriteLine("File,Extracted URL,Status,Suggestion");
+                string fullPath = Path.Combine(Directory.GetCurrentDirectory(), relativePath);
 
-                foreach (var relativePath in relativePaths)
+                if (File.Exists(fullPath) && IsSupportedExtension(fullPath))
                 {
-                    string fullPath = Path.Combine(Directory.GetCurrentDirectory(), relativePath);
+                    ExtractUrlsFromFile(fullPath, urlWriter, ref totalChecked, ref foundCount, ref notFoundCount, ref fixedCount);
+                }
 
-                    if (File.Exists(fullPath) && IsSupportedExtension(fullPath))
+                if (totalChecked % 5 == 0) // Update progress for every 5 files checked
+                {
+                    Console.WriteLine($"Checked {totalChecked} files...");
+                }
+            }
+        }
+
+        Console.ForegroundColor = ConsoleColor.Blue;
+        Console.WriteLine($"Total files checked: {totalChecked}");
+        Console.WriteLine($"Found: {foundCount}");
+        Console.WriteLine($"Not Found: {notFoundCount}");
+        Console.WriteLine($"Fixed: {fixedCount}");
+        Console.ResetColor();
+    }
+
+    private void ExtractUrlsFromFile(string fullPath, StreamWriter urlWriter, ref int totalChecked, ref int foundCount, ref int notFoundCount, ref int fixedCount)
+    {
+        string[] lines = File.ReadAllLines(fullPath);
+        bool fileUpdated = false;
+
+        Console.WriteLine($"Loading... Processing file: {fullPath}");
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            var matches = Regex.Matches(line, @"url\s*:\s*['\']([^'\']+)['\']|require\(\s*['\']([^'\']+)['\']\)", RegexOptions.IgnoreCase);
+
+            foreach (Match match in matches)
+            {
+                string extractedPath = !string.IsNullOrEmpty(match.Groups[1].Value) ? match.Groups[1].Value : match.Groups[2].Value;
+                string status = allRelativePaths.Contains(extractedPath) ? "Found" : "Not Found";
+                string suggestion = "";
+
+                if (status == "Found")
+                {
+                    foundCount++;
+                }
+                else
+                {
+                    notFoundCount++;
+                    var similarPath = allRelativePaths.FirstOrDefault(p => p.Equals(extractedPath, StringComparison.OrdinalIgnoreCase));
+                    if (similarPath != null && similarPath != extractedPath)
                     {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine("Process File " + fullPath);
-                        Console.ResetColor();
-                        ExtractUrlsFromFile(fullPath, urlWriter);
+                        suggestion = $"{similarPath}";
+                        
+                        // Update the line with the suggested path
+                        line = line.Replace(extractedPath, suggestion);
+                        fileUpdated = true;
+                        fixedCount++;
                     }
                 }
+
+                urlWriter.WriteLine($"{fullPath},{extractedPath},{status},{suggestion}");
             }
+
+            lines[i] = line; // Update the line in the lines array
         }
 
-        private void ExtractUrlsFromFile(string fullPath, StreamWriter urlWriter)
+        totalChecked++;
+
+        // Write back the updated lines to the file if any changes were made
+        if (fileUpdated)
         {
-            Console.WriteLine("Processing file: " + fullPath);
-
-            string[] lines = File.ReadAllLines(fullPath);
-
-            foreach (string line in lines)
-            {
-                var matches = Regex.Matches(line, @"url\s*:\s*['\']([^'\']+)['\']|require\(\s*['\']([^'\']+)['\']\)", RegexOptions.IgnoreCase);
-
-                foreach (Match match in matches)
-                {
-                    string extractedPath = !string.IsNullOrEmpty(match.Groups[1].Value) ? match.Groups[1].Value : match.Groups[2].Value;
-                    string status = allRelativePaths.Contains(extractedPath) ? "Found" : "Not Found";
-                    string suggestion = "";
-                    if (status == "Not Found")
-                    {
-                        var similarPath = allRelativePaths.FirstOrDefault(p => p.Equals(extractedPath, StringComparison.OrdinalIgnoreCase));
-                        if (similarPath != null && similarPath != extractedPath)
-                        {
-                            suggestion = $"{similarPath}";
-                        }
-                    }
-                    urlWriter.WriteLine($"{fullPath},{extractedPath},{status},{suggestion}");
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"Extracted URL: {extractedPath} from file {fullPath} - Status: {status}");
-                    Console.ResetColor();
-                }
-            }
-        }
-
-        private bool IsSupportedExtension(string filePath)
-        {
-            return SupportedExtensions.Any(ext => ext.Equals(Path.GetExtension(filePath), StringComparison.OrdinalIgnoreCase));
+            File.WriteAllLines(fullPath, lines);
+            Console.WriteLine($"Updated file: {fullPath}");
         }
     }
+
+    private bool IsSupportedExtension(string filePath)
+    {
+        return SupportedExtensions.Any(ext => ext.Equals(Path.GetExtension(filePath), StringComparison.OrdinalIgnoreCase));
+    }
+}
