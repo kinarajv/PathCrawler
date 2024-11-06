@@ -26,11 +26,15 @@ class PathChecker
                 foreach (string relativeFilePath in allRelativePaths)
                 {
                     writer.WriteLine(relativeFilePath);
+                    Console.ForegroundColor = ConsoleColor.Cyan;
                     Console.WriteLine("File Found : " + relativeFilePath);
+                    Console.ResetColor();
                 }
             }
 
+            Console.BackgroundColor = ConsoleColor.Green;
             Console.WriteLine("Relative file paths saved to: " + csvFilePath);
+            Console.ResetColor();
         }
 
         public void ExtractAjaxUrls(string csvPath)
@@ -47,7 +51,9 @@ class PathChecker
 
                     if (File.Exists(fullPath) && IsSupportedExtension(fullPath))
                     {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine("Process File " + fullPath);
+                        Console.ResetColor();
                         ExtractUrlsFromFile(fullPath, urlWriter);
                     }
                 }
@@ -78,7 +84,9 @@ class PathChecker
                         }
                     }
                     urlWriter.WriteLine($"{fullPath},{extractedPath},{status},{suggestion}");
+                    Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine($"Extracted URL: {extractedPath} from file {fullPath} - Status: {status}");
+                    Console.ResetColor();
                 }
             }
         }
