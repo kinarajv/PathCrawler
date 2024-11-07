@@ -78,6 +78,8 @@ class PathChecker
     {
         string[] lines = File.ReadAllLines(fullPath);
         bool fileUpdated = false;
+
+        Console.WriteLine($"Loading... Processing file: {fullPath}");
         for (int i = 0; i < lines.Length; i++)
         {
             string line = lines[i];
@@ -134,5 +136,43 @@ class PathChecker
     private bool IsSupportedExtension(string filePath)
     {
         return SupportedExtensions.Any(ext => ext.Equals(Path.GetExtension(filePath), StringComparison.OrdinalIgnoreCase));
+    }
+
+    public void UpdateJavaScriptFiles()
+    {
+        Console.WriteLine("Loading... Updating JavaScript files with correct PHP paths.");
+        foreach (string relativePath in allRelativePaths)
+        {
+            if (Path.GetExtension(relativePath).Equals(".js", StringComparison.OrdinalIgnoreCase))
+            {
+                string fullPath = Path.Combine(Directory.GetCurrentDirectory(), relativePath);
+                if (File.Exists(fullPath))
+                {
+                    string[] lines = File.ReadAllLines(fullPath);
+                    bool fileUpdated = false;
+
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        var matches = Regex.Matches(lines[i], @"['\']([^'\']+\.php)['\']", RegexOptions.IgnoreCase);
+                        foreach (Match match in matches)
+                        {
+                            string phpPath = match.Groups[1].Value;
+                            var similarPath = allRelativePaths.FirstOrDefault(p => p.EndsWith(phpPath, StringComparison.OrdinalIgnoreCase));
+                            if (similarPath != null && similarPath != phpPath)
+                            {
+                                lines[i] = lines[i].Replace(phpPath, similarPath);
+                                fileUpdated = true;
+                            }
+                        }
+                    }
+
+                    if (fileUpdated)
+                    {
+                        File.WriteAllLines(fullPath, lines);
+                        Console.WriteLine($"Updated JavaScript file: {fullPath}");
+                    }
+                }
+            }
+        }
     }
 }
