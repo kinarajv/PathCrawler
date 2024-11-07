@@ -78,8 +78,6 @@ class PathChecker
     {
         string[] lines = File.ReadAllLines(fullPath);
         bool fileUpdated = false;
-
-        Console.WriteLine($"Loading... Processing file: {fullPath}");
         for (int i = 0; i < lines.Length; i++)
         {
             string line = lines[i];

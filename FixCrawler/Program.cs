@@ -37,6 +37,7 @@
       {
         Console.WriteLine("Invalid choice. Exiting...");
       }
+      Console.ReadLine();
     }
   }
 }
