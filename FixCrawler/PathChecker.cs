@@ -6,7 +6,7 @@ class PathChecker
 {
     private const string CsvFileName = "relative_file_paths.csv";
     private const string ExtractedUrlsCsvFileName = "extracted_urls.csv";
-    private static readonly string[] SupportedExtensions = { ".js", ".php" };
+    private static readonly string[] SupportedExtensions = { ".js", ".php", ".html" };
 
     private List<string> allRelativePaths = new List<string>();
 
@@ -27,10 +27,6 @@ class PathChecker
             {
                 writer.WriteLine(relativeFilePath);
                 totalFiles++;
-                if (totalFiles % 10 == 0) // Update progress for every 10 files
-                {
-                    Console.WriteLine($"Processed {totalFiles} files...");
-                }
             }
         }
 
@@ -61,8 +57,7 @@ class PathChecker
                 {
                     ExtractUrlsFromFile(fullPath, urlWriter, ref totalChecked, ref foundCount, ref notFoundCount, ref fixedCount);
                 }
-
-                if (totalChecked % 5 == 0) // Update progress for every 5 files checked
+                if (totalChecked % 10 == 0) 
                 {
                     Console.WriteLine($"Checked {totalChecked} files...");
                 }
@@ -88,11 +83,22 @@ class PathChecker
         for (int i = 0; i < lines.Length; i++)
         {
             string line = lines[i];
-            var matches = Regex.Matches(line, @"url\s*:\s*['\']([^'\']+)['\']|require\(\s*['\']([^'\']+)['\']\)", RegexOptions.IgnoreCase);
+            var matches = Regex.Matches(line, @"url\s*:\s*['\']([^'\']+)['\']|require\(\s*['\']([^'\']+)['\']\)|<link\s+.*?href=\'([^\']+)\'|<script\s+.*?src=\'([^\']+)\'|require_once\(\s*['\']([^'\']+)['\']\)|require\(\s*['\']([^'\']+)['\']\)", RegexOptions.IgnoreCase);
 
             foreach (Match match in matches)
             {
-                string extractedPath = !string.IsNullOrEmpty(match.Groups[1].Value) ? match.Groups[1].Value : match.Groups[2].Value;
+                string extractedPath = match.Groups[1].Value;
+                if (string.IsNullOrEmpty(extractedPath))
+                    extractedPath = match.Groups[2].Value;
+                if (string.IsNullOrEmpty(extractedPath))
+                    extractedPath = match.Groups[3].Value;
+                if (string.IsNullOrEmpty(extractedPath))
+                    extractedPath = match.Groups[4].Value;
+                if (string.IsNullOrEmpty(extractedPath))
+                    extractedPath = match.Groups[5].Value;
+                if (string.IsNullOrEmpty(extractedPath))
+                    extractedPath = match.Groups[6].Value;
+
                 string status = allRelativePaths.Contains(extractedPath) ? "Found" : "Not Found";
                 string suggestion = "";
 
@@ -107,8 +113,6 @@ class PathChecker
                     if (similarPath != null && similarPath != extractedPath)
                     {
                         suggestion = $"{similarPath}";
-                        
-                        // Update the line with the suggested path
                         line = line.Replace(extractedPath, suggestion);
                         fileUpdated = true;
                         fixedCount++;
@@ -118,16 +122,14 @@ class PathChecker
                 urlWriter.WriteLine($"{fullPath},{extractedPath},{status},{suggestion}");
             }
 
-            lines[i] = line; // Update the line in the lines array
+            lines[i] = line;
         }
 
         totalChecked++;
-
-        // Write back the updated lines to the file if any changes were made
+        
         if (fileUpdated)
         {
             File.WriteAllLines(fullPath, lines);
-            Console.WriteLine($"Updated file: {fullPath}");
         }
     }
 
